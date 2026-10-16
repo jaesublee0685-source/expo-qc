@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#FFFFFF">
 <title>EXPO 모듈 QC</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
 <style>
 /* EXPO 모듈 QC — Enterprise AI Design System 적용
    토큰: 명세 §14 의미 토큰을 앱 별칭으로 연결 (컴포넌트는 별칭만 사용) */
@@ -950,7 +950,8 @@ const DB = (() => {
       try{
         const r = indexedDB.open('expo-qc', 1);
         r.onupgradeneeded = () => { const d=r.result; d.createObjectStore('insp',{keyPath:'id'}); const p=d.createObjectStore('photos',{keyPath:'id'}); p.createIndex('insp','inspId'); d.createObjectStore('kv',{keyPath:'k'}); };
-        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+        setTimeout(()=>rej(new Error('IndexedDB 응답 없음')), 4000);
       }catch(e){ rej(e); }
     }).catch(e => { mem = {insp:new Map(), photos:new Map(), kv:new Map()}; console.warn('IndexedDB 사용 불가, 메모리 저장', e); return null; });
     return dbp;
@@ -1655,12 +1656,24 @@ window.addEventListener('pagehide', ()=>{ if(INS){ clearTimeout(saveTimer); save
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && INS){ clearTimeout(saveTimer); saveIns(); } });
 
 /* ================= 시작 ================= */
+function showFatal(err){
+  const msg=(err&&(err.stack||err.message))||String(err); console.error(err);
+  const a=$('app'); if(!a) return;
+  if(a.dataset.fatal) return; a.dataset.fatal='1';
+  a.insertAdjacentHTML('afterbegin',`<div class="wrap"><div class="card" style="border-color:var(--color-status-danger);display:grid;gap:10px">
+    <h2 style="font-size:18px">화면을 여는 중 오류가 났습니다</h2>
+    <p class="note">아래 내용을 캡처해서 담당자에게 보내 주세요. (페이지를 새로고침하면 다시 시도합니다)</p>
+    <pre style="white-space:pre-wrap;font-size:12px;background:var(--panel2);padding:12px;border-radius:8px;margin:0;max-height:300px;overflow:auto">${esc(navigator.userAgent+'\n'+location.protocol+'\n'+msg)}</pre>
+    <div class="btns"><button class="btn pri" onclick="location.reload()">새로고침</button></div></div></div>`);
+}
+window.addEventListener('error', e=>showFatal(e.error||e.message));
+window.addEventListener('unhandledrejection', e=>showFatal(e.reason));
 (async()=>{
   await loadSettings();
   try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
   if('serviceWorker' in navigator && !inFrame && /^https?:/.test(location.protocol)){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
   await go('list');
-})();
+})().catch(showFatal);
 </script>
 </body>
 </html>
