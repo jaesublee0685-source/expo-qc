@@ -1006,7 +1006,7 @@ function evalCode(code){
   const dev=r1(v.meas - v.design); return {st: Math.abs(dev) <= (v.tol??0)+1e-9 ? 'ok':'ng', d:v.design, dev};
 }
 function groupStat(g){
-  let m=0,ng=0,nd=0; g.items.forEach(it=>{ const v=INS.values[it.code]; const e=evalCode(it.code); if(v.meas!=null) m++; if(e.st==='ng') ng++; if(v.design==null) nd++; });
+  let m=0,ng=0,nd=0; g.items.forEach(it=>{ const v=INS.values[it.code]||{}; const e=evalCode(it.code); if(v.meas!=null) m++; if(e.st==='ng') ng++; if(v.design==null) nd++; });
   return {m,ng,nd,n:g.items.length};
 }
 function totals(){ let m=0,n=0,ng=0,nd=0; groupsFor(INS.type).forEach(g=>{const s=groupStat(g); m+=s.m; n+=s.n; ng+=s.ng; nd+=s.nd;}); return {m,n,ng,nd,ok:m-ng-countND()}; }
@@ -1115,7 +1115,7 @@ function svgView(vid, items, o={}){
 /* ================= 화면: 목록 ================= */
 let SCREEN='list', newType='A', armDel=null;
 async function screenList(){
-  const list=(await DB.all('insp')).filter(x=>x.app==='expo-qc').sort((a,b)=>b.updated-a.updated);
+  const list=(await DB.all('insp')).filter(x=>x.app==='expo-qc' && x.meta && TYPES[x.type]).map(x=>{ try{ return syncIns(x); }catch(e){ return x; } }).sort((a,b)=>b.updated-a.updated);
   const missing = ['A','B'].map(t=>({t, n:Object.values(SET.types[t]).filter(v=>v.design==null).length}));
   const cards = list.map(x=>{ const prev=INS; INS=x; const tt=totals(); INS=prev;
     return `<div class="card ic">
